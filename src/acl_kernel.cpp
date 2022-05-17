@@ -321,7 +321,9 @@ CL_API_ENTRY cl_int CL_API_CALL clSetKernelArgIntelFPGA(cl_kernel kernel,
   cl_context context;
   cl_bool is_pipe = CL_FALSE;
   cl_bool is_sampler = CL_FALSE;
-  acl_lock();
+
+  acl_lock(get_device_op_queue_locking_data_from_kernel(kernel));
+  //acl_lock();
 
   if (!acl_kernel_is_valid(kernel)) {
     UNLOCK_RETURN(CL_INVALID_KERNEL);
@@ -737,7 +739,9 @@ ACL_EXPORT
 CL_API_ENTRY cl_int CL_API_CALL clSetKernelArgSVMPointerIntelFPGA(
     cl_kernel kernel, cl_uint arg_index, const void *arg_value) {
   cl_context context;
-  acl_lock();
+  
+  acl_lock(get_device_op_queue_locking_data_from_kernel(kernel));
+  //acl_lock();
 
 #ifndef REMOVE_VALID_CHECKS
   if (!acl_kernel_is_valid(kernel)) {
@@ -841,7 +845,9 @@ CL_API_ENTRY cl_int CL_API_CALL clSetKernelArgSVMPointer(
 ACL_EXPORT
 CL_API_ENTRY cl_int CL_API_CALL clSetKernelArgMemPointerINTEL(
     cl_kernel kernel, cl_uint arg_index, const void *arg_value) {
-  acl_lock();
+  
+  acl_lock(get_device_op_queue_locking_data_from_kernel(kernel));
+  //acl_lock();
 
   if (!acl_kernel_is_valid(kernel)) {
     UNLOCK_RETURN(CL_INVALID_KERNEL);
@@ -1479,7 +1485,9 @@ CL_API_ENTRY cl_int CL_API_CALL clEnqueueNativeKernelIntelFPGA(
     size_t cb_args, cl_uint num_mem_objects, const cl_mem *mem_list,
     const void **args_mem_loc, cl_uint num_events_in_wait_list,
     const cl_event *event_wait_list, cl_event *event) {
-  acl_lock();
+
+  acl_lock(get_device_op_queue_locking_data_from_command_queue(command_queue));
+  //acl_lock();
 
   if (!acl_command_queue_is_valid(command_queue)) {
     UNLOCK_RETURN(CL_INVALID_COMMAND_QUEUE);
@@ -1521,7 +1529,9 @@ clEnqueueTaskIntelFPGA(cl_command_queue command_queue, cl_kernel kernel,
   size_t task_global_work_size = 1;
   size_t task_local_work_size = 1;
   cl_int ret;
-  acl_lock();
+
+  acl_lock(get_device_op_queue_locking_data_from_command_queue(command_queue));
+  // acl_lock();
 
   ret = l_enqueue_kernel_with_type(
       command_queue, kernel,
@@ -1550,14 +1560,8 @@ CL_API_ENTRY cl_int CL_API_CALL clEnqueueNDRangeKernelIntelFPGA(
     const cl_event *event_wait_list, cl_event *event) {
   cl_int ret;
 
-#if 0
-  acl_locking_data_t *locking_data = nullptr;
-  if (command_queue != nullptr) {
-    locking_data = get_device_op_queue_locking_data_from_context(command_queue->context);
-  }
-  acl_lock(locking_data);
-  #endif
-  acl_lock();
+  acl_lock(get_device_op_queue_locking_data_from_command_queue(command_queue));
+  // acl_lock();
 
   ret = l_enqueue_kernel_with_type(
       command_queue, kernel, work_dim, global_work_offset, global_work_size,
@@ -1688,7 +1692,9 @@ static cl_int l_enqueue_kernel_with_type(
   acl_mem_migrate_t memory_migration;
   cl_int status = CL_SUCCESS;
   int serialization_needed = 0;
-  acl_assert_locked();
+
+  acl_assert_locked(get_device_op_queue_locking_data_from_command_queue(command_queue));
+
 
 #ifndef REMOVE_VALID_CHECKS
   if (!acl_command_queue_is_valid(command_queue)) {
@@ -2338,7 +2344,7 @@ void acl_reset_kernel(cl_kernel kernel) {
 
 // Just a regular old reference counted object.
 int acl_kernel_is_valid(cl_kernel kernel) {
-  acl_assert_locked();
+  acl_assert_locked(get_device_op_queue_locking_data_from_kernel(kernel));
 
 #ifdef REMOVE_VALID_CHECKS
   return 1;

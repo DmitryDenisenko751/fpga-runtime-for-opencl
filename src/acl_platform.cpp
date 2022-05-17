@@ -856,9 +856,9 @@ static void l_add_device(int idx) {
 // acl_*_is_valid( * );
 // This is simple because everything is statically allocated.
 
-int acl_device_is_valid_ptr(cl_device_id device) {
+int acl_device_is_valid_ptr(cl_device_id device, acl_locking_data_t *locking_data) {
   unsigned int i;
-  acl_assert_locked();
+  acl_assert_locked(locking_data);
 
   for (i = 0; i < acl_platform.num_devices; i++) {
     if (device == &(acl_platform.device[i])) {
@@ -868,8 +868,8 @@ int acl_device_is_valid_ptr(cl_device_id device) {
   return 0;
 }
 
-int acl_kernel_is_valid_ptr(cl_kernel kernel) {
-  acl_assert_locked();
+int acl_kernel_is_valid_ptr(cl_kernel kernel, acl_locking_data_t *locking_data) {
+  acl_assert_locked(locking_data);
 
 #ifdef REMOVE_VALID_CHECKS
   return 1;
@@ -884,8 +884,8 @@ int acl_kernel_is_valid_ptr(cl_kernel kernel) {
 #endif
 }
 
-int acl_sampler_is_valid_ptr(cl_sampler sampler) {
-  acl_assert_locked();
+int acl_sampler_is_valid_ptr(cl_sampler sampler, acl_locking_data_t *locking_data) {
+  acl_assert_locked(locking_data);
 #ifdef REMOVE_VALID_CHECKS
   return 1;
 #else
@@ -915,8 +915,8 @@ int acl_sampler_is_valid_ptr(cl_sampler sampler) {
 #endif
 }
 
-int acl_pipe_is_valid_pointer(cl_mem mem_obj, cl_kernel kernel) {
-  acl_assert_locked();
+int acl_pipe_is_valid_pointer(cl_mem mem_obj, cl_kernel kernel, acl_locking_data_t *locking_data) {
+  acl_assert_locked(locking_data);
 
   if (mem_obj == 0) {
     return 0;
@@ -932,8 +932,8 @@ int acl_pipe_is_valid_pointer(cl_mem mem_obj, cl_kernel kernel) {
   return 0;
 }
 
-void acl_release_leaked_objects(void) {
-  acl_assert_locked();
+void acl_release_leaked_objects(acl_locking_data_t *locking_data) {
+  acl_assert_locked(locking_data);
 
   if (acl_platform.track_leaked_objects) {
     acl_cl_object_node_t *node = acl_platform.cl_obj_head;
@@ -968,8 +968,8 @@ void acl_release_leaked_objects(void) {
   }
 }
 
-void acl_track_object(acl_cl_object_type_t type, void *object) {
-  acl_assert_locked();
+void acl_track_object(acl_cl_object_type_t type, void *object, acl_locking_data_t *locking_data) {
+  acl_assert_locked(locking_data);
 
   if (acl_platform.track_leaked_objects) {
     acl_cl_object_node_t *node =
@@ -983,8 +983,8 @@ void acl_track_object(acl_cl_object_type_t type, void *object) {
   }
 }
 
-void acl_untrack_object(void *object) {
-  acl_assert_locked();
+void acl_untrack_object(void *object, acl_locking_data_t *locking_data) {
+  acl_assert_locked(locking_data);
 
   if (acl_platform.track_leaked_objects) {
     acl_cl_object_node_t *node;
@@ -1002,7 +1002,8 @@ void acl_untrack_object(void *object) {
 
 void acl_receive_device_exception(unsigned physical_device_id,
                                   CL_EXCEPTION_TYPE_INTEL exception_type,
-                                  void *user_private_info, size_t user_cb) {
+                                  void *user_private_info, size_t user_cb, 
+                                  acl_locking_data_t *locking_data) {
   // This function can potentially be called by a HAL that does not use the
   // ACL global lock, so we need to use acl_lock() instead of
   // acl_assert_locked(). However, the MMD HAL calls this function from a unix
@@ -1011,8 +1012,8 @@ void acl_receive_device_exception(unsigned physical_device_id,
   // acl_assert_locked_or_sig() instead of just acl_assert_locked().
   CL_EXCEPTION_TYPE_INTEL current_exception, listen_mask;
 
-  if (!acl_is_inside_sig()) {
-    acl_lock();
+  if (!acl_is_inside_sig(locking_data)) {
+    acl_lock(locking_data);
   }
   current_exception =
       acl_platform.device[physical_device_id].device_exception_status;
@@ -1063,16 +1064,17 @@ void acl_receive_device_exception(unsigned physical_device_id,
   if (listen_mask & exception_type) {
     // Signal all waiters so that acl_idle_update() calls user's exception
     // callback
-    acl_signal_device_update();
+    acl_signal_device_update(locking_data);
   }
 
-  if (!acl_is_inside_sig()) {
-    acl_unlock();
+  if (!acl_is_inside_sig(locking_data)) {
+    acl_unlock(locking_data);
   }
 }
 
-acl_device_op_queue_t *get_device_op_queue(unsigned int physical_device_id) {
+acl_device_op_queue_t *get_device_op_queue(unsigned int physical_device_id, acl_locking_data_t *locking_data) {
 
+  acl_assert_locked(locking_data);
   int idx = 0;
   if (idx >= ACL_MAX_DEVICE) {
     return nullptr;
@@ -1085,7 +1087,9 @@ acl_device_op_queue_t *get_device_op_queue(unsigned int physical_device_id) {
   }
 }
 
-acl_device_op_queue_t *get_device_op_queue_from_context(cl_context context) {
+acl_device_op_queue_t *get_device_op_queue_from_context(cl_context context, acl_locking_data_t *locking_data) {
+
+  acl_assert_locked(locking_data);
   if (context != nullptr && context->num_devices > 0) {
     unsigned int physical_device_id = context->device[0]->def.physical_device_id;
     return get_device_op_queue(physical_device_id);
@@ -1094,7 +1098,12 @@ acl_device_op_queue_t *get_device_op_queue_from_context(cl_context context) {
   }
 }
 
-acl_locking_data_t *get_device_op_queue_locking_data(cl_device_id device) {
+acl_locking_data_t *get_device_op_queue_locking_data(cl_device_id device, acl_locking_data_t *locking_data) {
+
+  acl_assert_locked(locking_data);
+  if (device == nullptr) {
+    return nullptr;
+  }
   unsigned int physical_device_id = device->def.physical_device_id;
   acl_device_op_queue_t *doq = get_device_op_queue(physical_device_id);
   if (doq != nullptr) {
@@ -1104,7 +1113,9 @@ acl_locking_data_t *get_device_op_queue_locking_data(cl_device_id device) {
   }
 }
 
-acl_locking_data_t *get_device_op_queue_locking_data_from_context(cl_context context) {
+acl_locking_data_t *get_device_op_queue_locking_data_from_context(cl_context context, acl_locking_data_t *locking_data) {
+
+  acl_assert_locked(locking_data);
   if (context != nullptr && context->num_devices > 0) {
     // all devices in a context are on the same device op queue
     return get_device_op_queue_locking_data(context->device[0]);
@@ -1112,6 +1123,27 @@ acl_locking_data_t *get_device_op_queue_locking_data_from_context(cl_context con
     return nullptr;
   }
 }
+
+acl_locking_data_t *get_device_op_queue_locking_data_from_command_queue(cl_command_queue command_queue, acl_locking_data_t *locking_data) {
+
+  acl_assert_locked(locking_data);
+  if (command_queue != nullptr) {
+    return get_device_op_queue_locking_data_from_context(command_queue->context);
+  } else {
+    return nullptr;
+  }
+}
+
+acl_locking_data_t *get_device_op_queue_locking_data_from_kernel(cl_kernel kernel, acl_locking_data_t *locking_data) {
+
+  acl_assert_locked(locking_data);
+  if (kernel != nullptr && kernel->program != nullptr) {
+    return get_device_op_queue_locking_data(kernel->program->device[0]);
+  } else {
+    return nullptr;
+  }
+}
+
 
 ACL_EXPORT
 CL_API_ENTRY void CL_API_CALL

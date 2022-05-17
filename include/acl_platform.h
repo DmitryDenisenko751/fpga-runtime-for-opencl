@@ -27,6 +27,8 @@ acl_device_op_queue_t *get_device_op_queue_from_context(cl_context context);
 
 acl_locking_data_t *get_device_op_queue_locking_data(cl_device_id device);
 acl_locking_data_t *get_device_op_queue_locking_data_from_context(cl_context context);
+acl_locking_data_t *get_device_op_queue_locking_data_from_command_queue(cl_command_queue command_queue);
+acl_locking_data_t *get_device_op_queue_locking_data_from_kernel(cl_kernel kernel);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -129,7 +129,8 @@ static inline int acl_is_locked(acl_locking_data_t *locking_data = nullptr) {
   if (locking_data == nullptr) {
     return acl_global_lock_count > 0;
   } else {
-    return (locking_data->lock_count > 0); 
+    // TODO: Temporarily allow to use EITHER the provided locking data or the global lock.
+    return (locking_data->lock_count > 0); // || (acl_global_lock_count > 0); 
   }
 }
 
